@@ -1,0 +1,14 @@
+{
+  "pins" : [
+    {
+      "identity" : "mi-network-kit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/imthath-m/mi-network-kit",
+      "state" : {
+        "revision" : "dfa0abf2c6b0b2e70658dbf16a34f9353c5a71ab",
+        "version" : "1.0.1"
+      }
+    }
+  ],
+  "version" : 2
+}
