@@ -64,6 +64,40 @@ public extension OpenAI {
       }
     }
   }
+
+  func completionStream(prompt: String, using model: Model, wordLimit: Int16 = 256, creativityScore: Double = 0.5) throws -> AsyncStream<Completion> {
+    let request: URLRequest = try OpenAI.Request
+      .completionRequest(prompt: prompt, model: model, wordLimit: wordLimit, creativityScore: creativityScore, stream: true)
+      .urlRequest()
+    return AsyncStream<Completion> { continuation in
+      MIEventHandler(request: request).observe { data in
+        guard let fullSring = String(data: data, encoding: .utf8) else {
+          log("Unable to get string from data")
+          return
+        }
+        for string in fullSring.components(separatedBy: "\n") {
+          guard !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+          let newString: String = string.hasPrefix("data: ") ? String(string.dropFirst(6)) : string
+          if newString == "[DONE]" {
+            log("END OF STREAM")
+            return continuation.finish()
+          }
+          guard let jsonData = newString.data(using: .utf8) else {
+            log("Unable to convert back to JSON data - \(string)")
+            return
+          }
+
+          do {
+            let result: Completion = try self.decoder.decode(Completion.self, from: jsonData)
+            continuation.yield(result)
+          } catch {
+            log("\nNO COMPLETION FOUND in string \(string)")
+            log("Error \(error.localizedDescription)")
+          }
+        }
+      }
+    }
+  }
 }
 
 extension OpenAI.Request {
