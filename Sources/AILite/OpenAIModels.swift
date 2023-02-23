@@ -29,8 +29,9 @@ public extension OpenAI {
   }
 
   enum Model: String, CaseIterable {
-    case textDavinci3 = "text-davinci-003" // max 4k tokens
     case codeDavinci2 = "code-davinci-002" // max 8k tokens
+    case textDavinci3 = "text-davinci-003" // max 4k tokens
+    case textCurie1 = "text-curie-001" // max 2k tokens
   }
 }
 
@@ -40,19 +41,26 @@ public extension OpenAI.Request {
   }
 }
 
+//struct StremedData: Codable {
+//  let id, object: String
+//  let created: Int
+//  let choices: [Completion.Choice]
+//  let model: String
+//}
+
 public struct Completion: Codable {
   public let id: String
   public let object: String
   public let created: Date
   public let model: String
   public let choices: [Choice]
-  public let usage: Usage
+  public let usage: Usage? // Usage is optional when we set `stream: true` in the request body
 
   public struct Choice: Codable {
     public let text: String
     public let index: Int
     public let logprobs: Logprobs?
-    public let finishReason: String
+    public let finishReason: String? // finsihReason is optional when we set `stream: true` in the request body
   }
 }
 
