@@ -33,35 +33,58 @@ public extension OpenAI {
     case textDavinci3 = "text-davinci-003" // max 4k tokens
     case textCurie1 = "text-curie-001" // max 2k tokens
   }
+
+  struct Chat: Codable {
+    public var role: String
+    public var content: String
+
+    public init(role: Role, content: String) {
+      self.role = role.rawValue
+      self.content = content
+    }
+  }
+}
+
+public extension OpenAI.Chat {
+  enum Model: String, CaseIterable {
+    case gpt = "gpt-3.5-turbo" // max 4k tokens
+    case gpt_301 = "gpt-3.5-turbo-0301" // max 4k tokens
+  }
+
+  enum Role: String, CaseIterable {
+    case system = "system"
+    case user = "user"
+    case bot = "assistant"
+  }
 }
 
 public extension OpenAI.Request {
   enum Path: String {
     case completions
+    case chat = "chat/completions"
   }
 }
 
-//struct StremedData: Codable {
-//  let id, object: String
-//  let created: Int
-//  let choices: [Completion.Choice]
-//  let model: String
-//}
-
-public struct Completion: Codable {
+public struct Completion<Choice: Codable>: Codable {
   public let id: String
   public let object: String
   public let created: Date
   public let model: String
   public let choices: [Choice]
   public let usage: Usage? // Usage is optional when we set `stream: true` in the request body
+}
 
-  public struct Choice: Codable {
-    public let text: String
-    public let index: Int
-    public let logprobs: Logprobs?
-    public let finishReason: String? // finsihReason is optional when we set `stream: true` in the request body
-  }
+public struct TextChoice: Codable {
+  public let text: String
+  public let index: Int
+  public let logprobs: Logprobs?
+  public let finishReason: String? // finsihReason is optional when we set `stream: true` in the request body
+}
+
+public struct ChatChoice: Codable {
+  public let message: OpenAI.Chat
+  public let logprobs: Logprobs?
+  public let finishReason: String? // finsihReason is optional when we set `stream: true` in the request body
 }
 
 public struct Usage {
@@ -70,13 +93,11 @@ public struct Usage {
   public let totalTokens: Int
 }
 
-extension Completion.Choice {
-  public struct Logprobs {
-    public let tokens: [String]
-    public let tokenLogprobs: [Float]
-    public let topLogprobs: [String: Float]
-    public let textOffset: [Int]
-  }
+public struct Logprobs {
+  public let tokens: [String]
+  public let tokenLogprobs: [Float]
+  public let topLogprobs: [String: Float]
+  public let textOffset: [Int]
 }
 
 // MARK: Custom Codable
@@ -90,7 +111,7 @@ extension Usage: Codable {
   }
 }
 
-extension Completion.Choice.Logprobs: Codable {
+extension Logprobs: Codable {
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.tokens = try container.decodeIfPresent([String].self, forKey: .tokens) ?? []
