@@ -21,6 +21,7 @@ public actor OpenAI: MINetworkable {
 public extension OpenAI {
   typealias ChatCompletion = Completion<ChatChoice>
   typealias TextCompletion = Completion<TextChoice>
+  typealias ChatStream = AsyncStream<Completion<ChatStreamChoice>>
 
   /// Completes a given prompt using a specified model, with an optional word limit and creativity score.
   ///
@@ -77,7 +78,7 @@ public extension OpenAI {
     let request: URLRequest = try OpenAI.Request
       .completionRequest(prompt: prompt, model: model, wordLimit: wordLimit, creativityScore: creativityScore, stream: true)
       .urlRequest()
-    return AsyncStream<Completion> { continuation in
+    return AsyncStream { continuation in
       MIEventHandler(request: request).observe { data in
         guard let fullSring = String(data: data, encoding: .utf8) else {
           log("Unable to get string from data")
@@ -97,6 +98,40 @@ public extension OpenAI {
 
           do {
             let result: TextCompletion = try self.decoder.decode(TextCompletion.self, from: jsonData)
+            continuation.yield(result)
+          } catch {
+            log("\nNO COMPLETION FOUND in string \(string)")
+            log("Error \(error.localizedDescription)")
+          }
+        }
+      }
+    }
+  }
+
+  func chatStream(thread: [Chat], using model: Chat.Model = .gpt, wordLimit: Int16 = 256, creativityScore: Double = 0.5) throws -> ChatStream {
+    let request: URLRequest = try OpenAI.Request
+      .chatRequest(thread: thread, model: model, wordLimit: wordLimit, creativityScore: creativityScore, stream: true)
+      .urlRequest()
+    return AsyncStream { continuation in
+      MIEventHandler(request: request).observe { data in
+        guard let fullString = String(data: data, encoding: .utf8) else {
+          log("Unable to get string from data")
+          return
+        }
+        for string in fullString.components(separatedBy: "\n") {
+          guard !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+          let newString: String = string.hasPrefix("data: ") ? String(string.dropFirst(6)) : string
+          if newString == "[DONE]" {
+            log("END OF STREAM")
+            return continuation.finish()
+          }
+          guard let jsonData = newString.data(using: .utf8) else {
+            log("Unable to convert back to JSON data - \(string)")
+            return
+          }
+
+          do {
+            let result: Completion<ChatStreamChoice> = try self.decoder.decode(Completion<ChatStreamChoice>.self, from: jsonData)
             continuation.yield(result)
           } catch {
             log("\nNO COMPLETION FOUND in string \(string)")

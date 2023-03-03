@@ -81,6 +81,15 @@ public struct TextChoice: Codable {
   public let finishReason: String? // finsihReason is optional when we set `stream: true` in the request body
 }
 
+public struct ChatStreamChoice: Codable {
+  public struct Delta: Codable {
+//    public let role: String?
+    public let content: String
+  }
+
+  public let delta: Delta
+  public let finishReason: String?
+}
 public struct ChatChoice: Codable {
   public let message: OpenAI.Chat
   public let logprobs: Logprobs?
