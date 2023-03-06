@@ -4,7 +4,6 @@
 
 import Foundation
 import MINetworkKit
-import VaanKit
 
 public actor OpenAI: MINetworkable {
   public let decoder: JSONDecoder = {
@@ -48,18 +47,18 @@ public extension OpenAI {
       .urlRequest()
     MIEventHandler(request: request).observe { data in
       guard let fullSring = String(data: data, encoding: .utf8) else {
-        log("Unable to get string from data")
+        debugPrint("Unable to get string from data")
         return
       }
       for string in fullSring.components(separatedBy: "\n") {
         guard !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
         let newString: String = string.hasPrefix("data: ") ? String(string.dropFirst(6)) : string
         guard newString != "[DONE]" else {
-          log("END OF STREAM")
+          debugPrint("END OF STREAM")
           return
         }
         guard let jsonData = newString.data(using: .utf8) else {
-          log("Unable to convert back to JSON data - \(string)")
+          debugPrint("Unable to convert back to JSON data - \(string)")
           return
         }
 
@@ -67,8 +66,8 @@ public extension OpenAI {
           let result: Completion = try self.decoder.decode(TextCompletion.self, from: jsonData)
           partCompletion(result)
         } catch {
-          log("\nNO COMPLETION FOUND in string \(string)")
-          log("Error \(error.localizedDescription)")
+          debugPrint("\nNO COMPLETION FOUND in string \(string)")
+          debugPrint("Error \(error.localizedDescription)")
         }
       }
     }
@@ -94,18 +93,18 @@ private extension OpenAI {
     AsyncStream { continuation in
       MIEventHandler(request: urlRequest).observe { data in
         guard let fullString = String(data: data, encoding: .utf8) else {
-          log("Unable to get string from data")
+          debugPrint("Unable to get string from data")
           return
         }
         for string in fullString.components(separatedBy: "\n") {
           guard !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
           let newString: String = string.hasPrefix("data: ") ? String(string.dropFirst(6)) : string
           if newString == "[DONE]" {
-            log("END OF STREAM")
+            debugPrint("END OF STREAM")
             return continuation.finish()
           }
           guard let jsonData = newString.data(using: .utf8) else {
-            log("Unable to convert back to JSON data - \(string)")
+            debugPrint("Unable to convert back to JSON data - \(string)")
             return
           }
 
@@ -113,8 +112,8 @@ private extension OpenAI {
             let result: AnyDecodable = try self.decoder.decode(AnyDecodable.self, from: jsonData)
             continuation.yield(result)
           } catch {
-            log("\nNO COMPLETION FOUND in string \(string)")
-            log("Error \(error.localizedDescription)")
+            debugPrint("\nNO COMPLETION FOUND in string \(string)")
+            debugPrint("Error \(error.localizedDescription)")
           }
         }
       }
