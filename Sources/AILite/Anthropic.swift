@@ -24,7 +24,7 @@ public class Anthropic: MINetworkable {
 
     public var body: Data?
 
-    init(messages: [Message], model: Model = .claudeInstantLatest, responseTokenLimit: Int = 5000) throws {
+    init(messages: [Message], model: Model, responseTokenLimit: Int, stream: Bool) throws {
       var prompt: String = ""
 
       messages.forEach { prompt += $0.sender.rawValue + $0.text }
@@ -32,14 +32,15 @@ public class Anthropic: MINetworkable {
       let dictionary: [String : Any] = [
         "prompt": prompt,
         "max_tokens_to_sample": responseTokenLimit,
-        "model": model.rawValue
+        "model": model.rawValue,
+        "stream": stream
       ]
 
       self.body = try JSONSerialization.data(withJSONObject: dictionary, options: [])
     }
   }
 
-  struct Response: Codable {
+  public struct Response: Codable {
     public let completion: String
   }
 }
@@ -49,9 +50,14 @@ public extension Anthropic {
 
   func complete(messages: [Message], model: Model = .claudeInstantLatest, responseTokenLimit: Int = 5000) async throws -> String {
     assert(!Anthropic.apiKey.isEmpty, "Set apiKey before calling complete endpoint")
-    let request = try Request(messages: messages, model: model, responseTokenLimit: responseTokenLimit).urlRequest()
+    let request = try Request(messages: messages, model: model, responseTokenLimit: responseTokenLimit, stream: false).urlRequest()
     let response: Response = try await get(from: request)
     return response.completion
+  }
+
+  func completionStream(messages: [Message], model: Model = .claudeInstantLatest, responseTokenLimit: Int = 5000) throws -> AsyncStream<Anthropic.Response> {
+    let request = try Request(messages: messages, model: model, responseTokenLimit: responseTokenLimit, stream: true).urlRequest()
+    return AsyncStream(urlRequest: request)
   }
 
   enum Model: String {

@@ -6,15 +6,17 @@ import Foundation
 import MINetworkKit
 
 public actor OpenAI: MINetworkable {
-  public let decoder: JSONDecoder = {
+  public init(apiKey: String) {
+    Request.apiKey = apiKey
+  }
+}
+
+extension JSONDecoder {
+  static let snakeCaseDecoder: JSONDecoder = {
     let decoder: JSONDecoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     return decoder
   }()
-
-  public init(apiKey: String) {
-    Request.apiKey = apiKey
-  }
 }
 
 public extension OpenAI {
@@ -77,20 +79,20 @@ public extension OpenAI {
     let request: URLRequest = try OpenAI.Request
       .completionRequest(prompt: prompt, model: model, wordLimit: wordLimit, creativityScore: creativityScore, stream: true)
       .urlRequest()
-    return streamResponse(from: request)
+    return AsyncStream(urlRequest: request)
   }
 
   func chatStream(thread: [Chat], using model: Chat.Model = .gpt, wordLimit: Int16 = 256, creativityScore: Double = 0.5) throws -> ChatStream {
     let request: URLRequest = try OpenAI.Request
       .chatRequest(thread: thread, model: model, wordLimit: wordLimit, creativityScore: creativityScore, stream: true)
       .urlRequest()
-    return streamResponse(from: request)
+    return AsyncStream(urlRequest: request)
   }
 }
 
-private extension OpenAI {
-  func streamResponse<AnyDecodable: Decodable>(from urlRequest: URLRequest) -> AsyncStream<AnyDecodable> {
-    AsyncStream { continuation in
+extension AsyncStream where Element: Decodable {
+  init(urlRequest: URLRequest) {
+    self.init { continuation in
       MIEventHandler(request: urlRequest).observe { data in
         guard let fullString = String(data: data, encoding: .utf8) else {
           debugPrint("Unable to get string from data")
@@ -99,7 +101,7 @@ private extension OpenAI {
         for string in fullString.components(separatedBy: "\n") {
           guard !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
           let newString: String = string.hasPrefix("data: ") ? String(string.dropFirst(6)) : string
-          if newString == "[DONE]" {
+          if newString == "[DONE]" || newString.hasPrefix("[DONE]") {
             debugPrint("END OF STREAM")
             return continuation.finish()
           }
@@ -109,7 +111,7 @@ private extension OpenAI {
           }
 
           do {
-            let result: AnyDecodable = try self.decoder.decode(AnyDecodable.self, from: jsonData)
+            let result: Element = try JSONDecoder.snakeCaseDecoder.decode(Element.self, from: jsonData)
             continuation.yield(result)
           } catch {
             debugPrint("\nNO COMPLETION FOUND in string \(string)")
